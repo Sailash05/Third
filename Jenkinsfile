@@ -1,30 +1,30 @@
+
 pipeline {
     agent any
 
     stages {
-
-        stage('Checkout') {
+        stage('Clean and Compile') {
             steps {
-                echo 'Fetching source code from GitHub'
-                checkout scm
+                bat 'mvn clean compile'
             }
         }
 
-        stage('Clean') {
+        stage('SonarQube Analysis') {
             steps {
-                bat 'mvn clean'
+                withSonarQubeEnv('LocalServerSonar') {
+                    bat '''
+                        mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar ^
+                        -Dsonar.projectKey=Third
+                    '''
+                }
             }
         }
 
-        stage('Compile') {
+        stage('Quality Gate') {
             steps {
-                bat 'mvn compile'
-            }
-        }
-
-        stage('Test') {
-            steps {
-                bat 'mvn test'
+                timeout(time: 10, unit: 'MINUTES') {
+                    waitForQualityGate(abortPipeline: true)
+                }
             }
         }
 
@@ -32,16 +32,6 @@ pipeline {
             steps {
                 bat 'mvn package'
             }
-        }
-    }
-
-    post {
-        success {
-            echo 'BUILD SUCCESSFUL!'
-        }
-
-        failure {
-            echo 'BUILD FAILED!'
         }
     }
 }
